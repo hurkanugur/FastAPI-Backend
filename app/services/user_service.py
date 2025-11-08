@@ -26,7 +26,7 @@ def get_user_by_email(db: Session, email: str) -> User:
     return user
 
 
-def update_user_profile(db: Session, user: User, full_name: str = None, password: str = None) -> User:
+def update_user(db: Session, user: User, full_name: str = None, password: str = None) -> User:
     """
     Update user's profile fields such as full name and password.
 
@@ -48,6 +48,25 @@ def update_user_profile(db: Session, user: User, full_name: str = None, password
     db.commit()
     db.refresh(user)
     return user
+
+def delete_user(db: Session, user: User) -> bool:
+    """
+    Delete a user from the database.
+
+    Args:
+        db (Session): SQLAlchemy database session
+        user (User): User object to delete
+
+    Returns:
+        bool: True if deletion was successful
+    """
+    try:
+        db.delete(user)
+        db.commit()
+        return True
+    except Exception as e:
+        db.rollback()
+        return False
 
 
 def authenticate_user(db: Session, email: str, password: str) -> User:

@@ -22,6 +22,7 @@ router = APIRouter(prefix="/users", tags=["Users"])
                 "Requires a valid Bearer token in the Authorization header."
 )
 def read_current_user(
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -33,7 +34,7 @@ def read_current_user(
     Returns:
         UserInfo: User details including id, email, full name, and creation timestamp
     """
-    return user_service.get_user_by_email(email=current_user.email, db=current_user.__dict__.get("db", None) or None)
+    return user_service.get_user_by_email(email=current_user.email, db=db)
 
 
 # ===============================
@@ -88,9 +89,36 @@ def update_current_user(
     Returns:
         UserInfo: Updated user details
     """
-    return user_service.update_user_profile(
+    return user_service.update_user(
         db=db,
         user=current_user,
         full_name=updated_data.full_name,
         password=updated_data.password
     )
+
+
+# ===============================
+# Delete current user
+# ===============================
+@router.delete(
+    "/me",
+    response_model=dict,
+    summary="Delete current user profile",
+    description="Delete the currently authenticated user's account from the system."
+)
+def delete_current_user(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> dict:
+    """
+    Delete the currently authenticated user.
+
+    Args:
+        db (Session): SQLAlchemy database session
+        current_user (User): Currently authenticated user
+
+    Returns:
+        dict: Success message
+    """
+    user_service.delete_user(db=db, user=current_user)
+    return {"detail": "User account deleted successfully."}

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Annotated
 
 from app.core.database import get_db
-from app.schemas.user_schema import UserCreate, UserInfo, Token
+from app.schemas.user_schema import RefreshTokenRequest, UserCreate, UserInfo, Token
 from app.services import auth_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -68,14 +68,14 @@ def login(user_create: UserCreate, db: Annotated[Session, Depends(get_db)]) -> T
     description="Use a valid refresh token to generate a new access token. "
                 "Returns both a new access token and refresh token."
 )
-def refresh_token(refresh_token: str = Body(..., description="Refresh token string")) -> Token:
+def refresh_token(refresh_token_request: RefreshTokenRequest) -> Token:
     """
     Refresh JWT access token using a refresh token.
 
     Args:
-        refresh_token (str): JWT refresh token
+        payload (RefreshTokenRequest): Object containing the refresh token.
 
     Returns:
         Token: New access token, new refresh token, and token type
     """
-    return auth_service.refresh_tokens(refresh_token=refresh_token)
+    return auth_service.refresh_tokens(refresh_token=refresh_token_request.refresh_token)

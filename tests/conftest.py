@@ -1,84 +1,54 @@
 import pytest
 from fastapi.testclient import TestClient
+from app.main import app
+from app.core.config import JWTSettings, AppSettings
+from app.core.database import engine, Base, SessionLocal
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
-from app.core.database import Base, get_db
-from app.main import app
-from app.models.user_model import User
-from app.core.security import get_password_hash
-
-# ------------------------------
-# Create in-memory SQLite DB
-# ------------------------------
-SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
-
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},  # Needed for SQLite in-memory
-    poolclass=StaticPool,
-)
-
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-# ------------------------------
-# DB Fixture
-# ------------------------------
-@pytest.fixture(scope="function")
-def db_session():
-    """
-    Returns a SQLAlchemy session connected to a fresh in-memory DB for each test.
-    """
-    # Create tables
-    Base.metadata.create_all(bind=engine)
-    session = TestingSessionLocal()
-    try:
-        yield session
-    finally:
-        session.rollback()
-        session.close()
-        Base.metadata.drop_all(bind=engine)  # Clean up after test
-
-
-# ------------------------------
-# FastAPI TestClient Fixture
-# ------------------------------
-@pytest.fixture(scope="function")
-def client(db_session):
-    """
-    Returns a TestClient with the get_db dependency overridden.
-    """
-    def override_get_db():
-        try:
-            yield db_session
-        finally:
-            pass
-
-    app.dependency_overrides[get_db] = override_get_db
-    client = TestClient(app)
-    try:
+# Fixture for creating a test client
+@pytest.fixture(scope="module")
+def client():
+    with TestClient(app) as client:
         yield client
-    finally:
-        app.dependency_overrides.clear()
 
+# Fixture for setting up and tearing down the test database
+@pytest.fixture(scope="module")
+def test_db():
+    # Set up the test database
+    test_db_url = "postgresql://test_user:test_password@localhost/test_db"
+    test_engine = create_engine(test_db_url, echo=True)
+    Base.metadata.create_all(bind=test_engine)
 
-# ------------------------------
-# Test User Fixture
-# ------------------------------
-@pytest.fixture(scope="function")
-def test_user(db_session):
-    """
-    Creates a test user in the database.
-    """
-    hashed_password = get_password_hash("testpassword")
-    user = User(
-        email="testuser@example.com",
-        hashed_password=hashed_password,
-        full_name="Test User",
+    # Create a session to interact with the test database
+    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+    db = TestingSessionLocal()
+    yield db  # Provide the session to the test
+
+    # Tear down the test database
+    Base.metadata.drop_all(bind=test_engine)
+    db.close()
+
+# Fixture for setting up JWT settings for testing
+@pytest.fixture(scope="module")
+def jwt_settings():
+    return JWTSettings(
+        secret_key="test_secret_key",
+        algorithm="HS256",
+        access_token_expire_minutes=30
     )
-    db_session.add(user)
-    db_session.commit()
-    db_session.refresh(user)
-    return user
+
+# Fixture to set app settings for testing
+@pytest.fixture(scope="module")
+def app_settings():
+    return AppSettings(
+        app_name="Test App",
+        app_env="testing",
+        app_port=8000
+    )
+
+# Fixture to mock the database interaction, so no actual database is needed for tests
+@pytest.fixture
+def mock_db_session(mocker, test_db):
+    mocker.patch("app.core.database.SessionLocal", return_value=test_db)
+    yield test_db

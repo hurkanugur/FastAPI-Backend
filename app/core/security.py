@@ -3,38 +3,36 @@ from jose import jwt, JWTError
 from passlib.context import CryptContext
 from app.core.config import jwt_settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 # ==============================
 # Password utils
 # ==============================
 def get_password_hash(password: str) -> str:
     """
-    Hash a plain password using bcrypt.
-    
+    Hash a plain password using Argon2.
+
     Args:
         password (str): Plain text password.
-    
+
     Returns:
         str: Hashed password.
     """
-    safe_password = password[:72]
-    return pwd_context.hash(safe_password)
+    return pwd_context.hash(password)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
-    Verify a plain password against a hashed password.
-    
+    Verify a plain password against a hashed password using Argon2.
+
     Args:
         plain_password (str): Plain text password.
         hashed_password (str): Hashed password.
-    
+
     Returns:
         bool: True if match, False otherwise.
     """
-    safe_password = plain_password[:72]
-    return pwd_context.verify(safe_password, hashed_password)
+    return pwd_context.verify(plain_password, hashed_password)
 
 
 # ==============================
