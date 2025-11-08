@@ -1,63 +1,102 @@
+import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
-from app.main import app
-from app.schemas.user_schema import UserInfo, UserCreate
+from unittest.mock import patch, MagicMock, ANY
+from app.routes import user_route
 
-client = TestClient(app)
+@pytest.mark.usefixtures("client")
+class TestUserRoute:
 
-# Dummy user data
-dummy_user = UserInfo(
-    id=1,
-    email="test@example.com",
-    full_name="Test User",
-    created_at="2025-11-07T12:00:00"
-)
+    def test_read_current_user_success(self, client: TestClient):
+        # Arrange
+        mock_user = MagicMock()
+        mock_user.email = "testuser@example.com"
 
-dummy_user_create = UserCreate(
-    email="test@example.com",
-    password="securepassword",
-    full_name="Test User"
-)
+        expected_response = {
+            "id": 1,
+            "email": "testuser@example.com",
+            "full_name": "Test User",
+            "created_at": "2025-11-07T21:45:00Z"
+        }
 
+        client.app.dependency_overrides[user_route.get_current_user] = lambda: mock_user
 
-@patch("app.services.user_service.get_user_by_email")
-@patch("app.core.dependencies.get_current_user")
-def test_read_current_user(mock_current_user, mock_get_user_by_email):
-    mock_current_user.return_value = MagicMock(email="test@example.com")
-    mock_get_user_by_email.return_value = dummy_user
+        with patch("app.services.user_service.get_user_by_email", return_value=expected_response):
+            # Act
+            response = client.get("/users/me")
 
-    response = client.get("/users/me")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["email"] == dummy_user.email
-    assert data["full_name"] == dummy_user.full_name
+            # Assert
+            assert response.status_code == 200
+            assert response.json() == expected_response
 
+        client.app.dependency_overrides.clear()
 
-@patch("app.services.user_service.list_all_users")
-@patch("app.core.dependencies.get_admin_user")
-def test_list_users(mock_get_admin, mock_list_all_users):
-    mock_get_admin.return_value = MagicMock(email="admin@example.com")
-    mock_list_all_users.return_value = [dummy_user]
+    def test_list_users_success_admin(self, client: TestClient):
+        # Arrange
+        mock_admin = MagicMock()
+        mock_admin.email = "admin@example.com"
+        mock_admin.role = "admin"
 
-    response = client.get("/users/")
-    assert response.status_code == 200
-    data = response.json()
-    assert isinstance(data, list)
-    assert data[0]["email"] == dummy_user.email
+        expected_users = [
+            {"id": 1, "email": "user1@example.com", "full_name": "User One", "created_at": "2025-11-07T21:45:00Z"},
+            {"id": 2, "email": "user2@example.com", "full_name": "User Two", "created_at": "2025-11-07T21:46:00Z"}
+        ]
 
+        client.app.dependency_overrides[user_route.get_admin_user] = lambda: mock_admin
 
-@patch("app.services.user_service.update_user_profile")
-@patch("app.core.dependencies.get_current_user")
-def test_update_current_user(mock_current_user, mock_update_user):
-    mock_current_user.return_value = MagicMock(email="test@example.com")
-    mock_update_user.return_value = dummy_user
+        with patch("app.services.user_service.list_all_users", return_value=expected_users):
+            # Act
+            response = client.get("/users/")
 
-    payload = {
-        "email": "test@example.com",
-        "password": "newpassword",
-        "full_name": "Updated User"
-    }
-    response = client.put("/users/me", json=payload)
-    assert response.status_code == 200
-    data = response.json()
-    assert data["full_name"] == dummy_user.full_name
+            # Assert
+            assert response.status_code == 200
+            assert response.json() == expected_users
+
+        client.app.dependency_overrides.clear()
+
+    def test_update_current_user_success(self, client: TestClient):
+        # Arrange
+        mock_user = MagicMock()
+        mock_user.email = "testuser@example.com"
+
+        updated_data = {
+            "email": "testuser@example.com",  # include email for UserCreate model
+            "full_name": "New Name",
+            "password": "newpassword123"
+        }
+
+        expected_response = {
+            "id": 1,
+            "email": "testuser@example.com",
+            "full_name": "New Name",
+            "created_at": "2025-11-07T21:45:00Z"
+        }
+
+        client.app.dependency_overrides[user_route.get_current_user] = lambda: mock_user
+
+        with patch("app.services.user_service.update_user", return_value=expected_response):
+            # Act
+            response = client.put("/users/me", json=updated_data)
+
+            # Assert
+            assert response.status_code == 200
+            assert response.json() == expected_response
+
+        client.app.dependency_overrides.clear()
+
+    def test_delete_current_user_success(self, client: TestClient):
+        # Arrange
+        mock_user = MagicMock()
+        mock_user.email = "testuser@example.com"
+
+        client.app.dependency_overrides[user_route.get_current_user] = lambda: mock_user
+
+        with patch("app.services.user_service.delete_user") as mock_delete:
+            # Act
+            response = client.delete("/users/me")
+
+            # Assert
+            assert response.status_code == 200
+            assert response.json() == {"detail": "User account deleted successfully."}
+            mock_delete.assert_called_once_with(db=ANY, user=mock_user)
+
+        client.app.dependency_overrides.clear()

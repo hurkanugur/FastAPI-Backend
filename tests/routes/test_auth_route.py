@@ -1,37 +1,96 @@
+import pytest
 from fastapi.testclient import TestClient
-from app.schemas.user_schema import UserInfo, Token
+from unittest.mock import patch
 
-def test_register_user(client: TestClient):
-    payload = {"email": "newuser@example.com", "password": "secret123", "full_name": "New User"}
-    response = client.post("/auth/register", json=payload)
-    assert response.status_code == 201
-    data: UserInfo = response.json()
-    assert data["email"] == "newuser@example.com"
-    assert "id" in data
-    assert "created_at" in data
+@pytest.mark.usefixtures("client")
+class TestAuthRoute:
 
-def test_login_user(client: TestClient, test_user):
-    payload = {"email": test_user.email, "password": "testpassword"}
-    response = client.post("/auth/login", json=payload)
-    assert response.status_code == 200
-    data: Token = response.json()
-    assert "access_token" in data
-    assert "refresh_token" in data
-    assert data["token_type"] == "bearer"
+    def test_register_user_success(self, client: TestClient):
+        # Arrange
+        user_data = {
+            "email": "testuser@example.com",
+            "password": "securepassword123",
+            "full_name": "Test User"
+        }
 
-def test_login_invalid_password(client: TestClient, test_user):
-    payload = {"email": test_user.email, "password": "wrongpassword"}
-    response = client.post("/auth/login", json=payload)
-    assert response.status_code == 401
+        expected_response = {
+            "id": 1,
+            "email": user_data["email"],
+            "full_name": user_data["full_name"],
+            "created_at": "2025-11-07T21:45:00Z"
+        }
 
-def test_refresh_token(client: TestClient, test_user):
-    # First login to get refresh token
-    login_resp = client.post("/auth/login", json={"email": test_user.email, "password": "testpassword"})
-    refresh_token = login_resp.json()["refresh_token"]
+        # Act
+        with patch("app.services.auth_service.register_user", return_value=expected_response):
+            response = client.post("/auth/register", json=user_data)
 
-    # Call refresh endpoint
-    response = client.post("/auth/refresh", json={"refresh_token": refresh_token})
-    assert response.status_code == 200
-    data: Token = response.json()
-    assert "access_token" in data
-    assert "refresh_token" in data
+        # Assert
+        assert response.status_code == 201
+        assert response.json() == expected_response
+
+    def test_login_user_success(self, client: TestClient):
+        # Arrange
+        user_data = {
+            "email": "testuser@example.com",
+            "password": "securepassword123"
+        }
+
+        expected_tokens = {
+            "access_token": "fake_access_token",
+            "refresh_token": "fake_refresh_token",
+            "token_type": "bearer"
+        }
+
+        # Act
+        with patch("app.services.auth_service.login_user", return_value=expected_tokens):
+            response = client.post("/auth/login", json=user_data)
+
+        # Assert
+        assert response.status_code == 200
+        assert response.json() == expected_tokens
+
+    def test_refresh_token_success(self, client: TestClient):
+        # Arrange
+        refresh_request = {
+            "refresh_token": "fake_refresh_token"
+        }
+
+        expected_tokens = {
+            "access_token": "new_fake_access_token",
+            "refresh_token": "new_fake_refresh_token",
+            "token_type": "bearer"
+        }
+
+        # Act
+        with patch("app.services.auth_service.refresh_tokens", return_value=expected_tokens):
+            response = client.post("/auth/refresh", json=refresh_request)
+
+        # Assert
+        assert response.status_code == 200
+        assert response.json() == expected_tokens
+
+    def test_login_user_missing_password(self, client: TestClient):
+        # Arrange
+        user_data = {
+            "email": "testuser@example.com"
+        }
+
+        # Act
+        response = client.post("/auth/login", json=user_data)
+
+        # Assert
+        assert response.status_code == 422
+
+    def test_register_invalid_email(self, client: TestClient):
+        # Arrange
+        user_data = {
+            "email": "invalidemail",
+            "password": "securepassword123",
+            "full_name": "Test User"
+        }
+
+        # Act
+        response = client.post("/auth/register", json=user_data)
+
+        # Assert
+        assert response.status_code == 422

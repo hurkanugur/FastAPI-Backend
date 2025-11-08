@@ -1,8 +1,5 @@
 from pydantic_settings import BaseSettings
 
-# ==============================
-# App settings
-# ==============================
 class AppSettings(BaseSettings):
     app_name: str
     app_env: str
@@ -12,23 +9,16 @@ class AppSettings(BaseSettings):
         env_file = ".env"
         extra="ignore"
 
-
-# ==============================
-# JWT / Auth settings
-# ==============================
 class JWTSettings(BaseSettings):
     secret_key: str
     algorithm: str
     access_token_expire_minutes: int
+    refresh_token_expire_days: int
 
     class Config:
         env_file = ".env"
         extra="ignore"
 
-
-# ==============================
-# Database settings
-# ==============================
 class DBSettings(BaseSettings):
     postgres_user: str
     postgres_password: str

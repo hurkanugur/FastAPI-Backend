@@ -11,10 +11,10 @@ class UserCreate(BaseModel):
     """
     email: EmailStr = Field(..., description="User's email address")
     password: str = Field(..., description="User's password")
-    full_name: str = Field(..., description="User's full name")
+    full_name: str | None = Field(None, description="User's full name")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "email": "user@example.com",
                 "password": "strongpassword123",
@@ -29,12 +29,12 @@ class UserInfo(BaseModel):
     """
     id: int = Field(..., description="User ID")
     email: EmailStr = Field(..., description="User's email address")
-    full_name: str = Field(..., description="User's full name")
+    full_name: str | None = Field(None, description="User's full name")
     created_at: datetime = Field(..., description="Account creation timestamp")
 
     class Config:
         from_attributes = True
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "id": 1,
                 "email": "user@example.com",
@@ -57,7 +57,7 @@ class Token(BaseModel):
     token_type: str = Field("bearer", description="Token type, usually 'bearer'")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "access_token": "eyJhbGciOiJIUzI1NiIsInR...",
                 "refresh_token": "eyJhbGciOiJIUzI1NiIsInR...",
@@ -73,7 +73,7 @@ class RefreshTokenRequest(BaseModel):
     refresh_token: str = Field(..., description="JWT refresh token")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "refresh_token": "eyJhbGciOiJIUzI1NiIsInR..."
             }

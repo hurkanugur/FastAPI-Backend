@@ -4,17 +4,11 @@ from typing import Dict
 
 router = APIRouter()
 
-
 @router.get(
-    "/",
+    "/", 
     summary="Root endpoint",
-    response_description="Welcome message with application name",
+    description="This is the root endpoint of the API. It returns a welcome message with the application's name."
 )
 def read_root() -> Dict[str, str]:
-    """
-    Root endpoint of the API.
-
-    Returns:
-        dict: A welcome message containing the application name from the settings.
-    """
+    """Return a welcome message with the application name."""
     return {"message": f"Welcome to {app_settings.app_name}!"}
